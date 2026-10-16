@@ -1,0 +1,13 @@
+### 创建短链
+POST http://localhost:8090/api/link
+Content-Type: application/json
+
+{
+  "originalUrl": "https://github.com/qqwbawb/gym-managment-project"
+}
+
+### 跳转测试（预期 302）
+GET http://localhost:8090/s/1
+
+### 测试不存在的短码（预期 404）
+GET http://localhost:8090/s/xxx999
