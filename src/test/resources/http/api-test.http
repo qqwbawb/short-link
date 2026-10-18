@@ -1,4 +1,9 @@
-### 创建短链
+### ============================================
+### 短链服务 · 接口测试
+### 端口 8090 | 面试目标：字节日常实习
+### ============================================
+
+### ① 创建短链（新链接）
 POST http://localhost:8090/api/link
 Content-Type: application/json
 
@@ -6,8 +11,57 @@ Content-Type: application/json
   "originalUrl": "https://github.com/qqwbawb/gym-managment-project"
 }
 
-### 跳转测试（预期 302）
-GET http://localhost:8090/s/1
+### ② 创建短链（另一个链接，用于对比）
+POST http://localhost:8090/api/link
+Content-Type: application/json
 
-### 测试不存在的短码（预期 404）
+{
+  "originalUrl": "https://www.baidu.com"
+}
+
+### ③ 重复创建（预期：提示"已有短链"）
+POST http://localhost:8090/api/link
+Content-Type: application/json
+
+{
+  "originalUrl": "https://github.com/qqwbawb/gym-managment-project"
+}
+
+### ============================================
+### 跳转测试（★ 缓存验证的核心）
+### ============================================
+
+### ④ 跳转 - 第一次（预期：302 + 控制台有 SQL）
+GET http://localhost:8090/s/2
+
+### ⑤ 跳转 - 第二次（预期：302 + 控制台【无 SQL】）
+GET http://localhost:8090/s/2
+
+### ⑥ 跳转 - 第三次（再确认一次）
+GET http://localhost:8090/s/2
+
+### ============================================
+### 异常测试
+### ============================================
+
+### ⑦ 不存在的短码（预期：404）
 GET http://localhost:8090/s/xxx999
+
+### ⑧ 空短码（预期：404 或 500）
+GET http://localhost:8090/s/
+
+### ============================================
+### 使用说明
+### ============================================
+### 1. 先跑 ① 拿到 shortCode（假设是 "1"）
+### 2. 跑 ④ → 看 IDEA 控制台，应该有 SELECT 语句
+### 3. 跑 ⑤ → 控制台应该【什么都没有】（走缓存了）
+### 4. 跑 ⑥ → 再确认一次
+### 5. 跑 ⑦ → 应该返回 404 + "短链不存在"
+###
+### ⚠️ IDEA 的 HTTP Client 会跟随 302 跳转
+###    如果显示证书错误（PKIX），那是跳转目标网站的证书问题，
+###    和你的代码无关。看状态码是 302 就说明对了。
+###
+### ⚠️ 把 ① 里的 1 换成你实际的 shortCode
+###    可以查数据库：SELECT short_code FROM short_link;
