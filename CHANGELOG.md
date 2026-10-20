@@ -2,6 +2,19 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.1.0] - 2026-10-20
+
+### 新增
+
+- 跳转时异步记录访问日志（IP、User-Agent、访问时间）到 `access_log` 表，基于 `@Async` + `@EnableAsync`，不阻塞跳转主流程。
+- 点击计数：跳转时 Redis `INCR shortLink:count:{code}` 计数，`ClickCountSyncTask` 定时任务（`@Scheduled`，每 10 秒）批量同步累加到数据库 `click_count` 字段。
+- 缓存穿透防护：短码不存在时写入空值缓存（TTL 60 秒），避免不存在的短码反复穿透数据库。
+- 启动类开启 `@EnableScheduling`，支持定时任务调度。
+
+### 修复
+
+- 修正缓存命中判断：命中空值缓存时返回 404（短链不存在），不再误跳转。
+
 ## [1.0.0] - 2026-10-18
 
 ### 新增
@@ -24,5 +37,4 @@
 
 ### 已知限制
 
-- `access_log` 表实体已建，访问日志未落库；点击计数 `clickCount` 未累加。
 - 分布式锁、过期清理、原链合法性校验尚未实现。

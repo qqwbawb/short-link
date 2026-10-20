@@ -38,6 +38,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLink>
 
     private static final String PREFIX = "shortLink:";
 
+    private static final String COUNT_PREFIX = "shortLink:count:";
+
     @Override
     public String getOriginalUrl(String shortCode) {
         //先查询redis缓存
@@ -45,7 +47,12 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLink>
         Object url = redisTemplate.opsForValue().get(key);
         //缓冲里面有，直接返回
         if(url!=null){//需要先判空再转字符串，否则会有空异常
-            return url.toString();
+            String code=(String)url;
+            if(code.equals("")){
+                return null;
+            }
+            redisTemplate.opsForValue().increment(COUNT_PREFIX+shortCode);
+            return code;
         }
 
         //缓冲里面没有去查数据库
@@ -54,10 +61,12 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLink>
 
         ShortLink shortLink = this.getOne(queryWrapper);
         if(shortLink==null){//缓存穿透
+            redisTemplate.opsForValue().set(key,"",60,TimeUnit.SECONDS);
             return null;
         }
 
         redisTemplate.opsForValue().set(key,shortLink.getOriginalUrl(),1, TimeUnit.HOURS);
+        redisTemplate.opsForValue().increment(COUNT_PREFIX+shortCode);
         //分布式锁，防止重复提交
 //        redisTemplate.opsForValue().setIfAbsent(key,shortLink.getClickCount(),1, TimeUnit.MINUTES);
         return shortLink.getOriginalUrl();

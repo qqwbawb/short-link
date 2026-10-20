@@ -10,4 +10,6 @@ public interface ShortLinkService extends IService<ShortLink> {
 
     //根据短码查原链
     String getOriginalUrl(String shortCode);
+
+    //异步访问日志
 }

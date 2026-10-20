@@ -17,6 +17,9 @@
 
 - **创建短链** `POST /api/link`：原链查重（同一原链不重复生成），Redis 自增序列生成 62 进制短码，写入 MySQL。
 - **短链跳转** `GET /s/{code}`：先查 Redis 缓存，未命中再查 MySQL 并回写缓存（TTL 1 小时），命中后 302 重定向到原链；短码不存在返回 404。
+- **缓存穿透防护**：短码不存在时向 Redis 写入空值缓存（TTL 60 秒），避免恶意短码持续打穿数据库。
+- **异步访问日志**：跳转时记录 IP、User-Agent、访问时间，`@Async` 异步写入 `access_log`，不阻塞主流程。
+- **点击计数同步**：跳转时 Redis `INCR` 计数（key：`shortLink:count:{code}`），定时任务每 10 秒批量落库到 `click_count`。
 - **统一响应体** `ResultVo<T>`（msg / code / data）。
 - **Redis 序列化**：key 使用 String 序列化，value 使用 Jackson JSON 序列化，避免 CLI 查看乱码。
 
@@ -37,8 +40,10 @@ short-link
     │   ├── controller/ShortLinkController.java
     │   ├── entity                          # ShortLink / AccessLog
     │   ├── mapper                         # ShortLinkMapper / AccessLogMapper
-    │   ├── service                         # 业务接口与实现（缓存读写在这里）
-    │   └── utils/ShortCodeGenerator.java   # 62 进制短码生成器
+    │   ├── service                         # 业务接口与实现（缓存读写、访问日志落库）
+    │   └── utils
+    │       ├── ShortCodeGenerator.java     # 62 进制短码生成器
+    │       └── ClickCountSyncTask.java     # 点击计数定时同步任务（每 10 秒）
     └── resources
         ├── application.yml
         └── mapper/ShortLinkMapper.xml
@@ -154,14 +159,18 @@ GET http://localhost:8090/s/{code}
 
 `ShortCodeGenerator` 通过 Redis `INCR shortLink:seq` 获取全局递增序号，再按 62 进制（`0-9`、`a-z`、`A-Z`）编码为短码，避免数据库自增 ID 直接暴露。
 
-### 缓存读写（读穿透 + 回写）
+### 缓存读写（读穿透 + 空值防护 + 回写）
 
 跳转流程：
 
 1. 查 Redis（key：`shortLink:{code}`，value：原链，TTL 1 小时）；
-2. 命中直接返回，无 SQL；
-3. 未命中查 MySQL，查到后回写 Redis 缓存；
-4. 查不到返回 `null`，控制器回 404。
+2. 命中直接返回并 `INCR shortLink:count:{code}` 计数，无 SQL；
+3. 未命中查 MySQL，查到后回写 Redis 缓存，同样计数；
+4. 查不到则写入空值缓存（TTL 60 秒）并返回 `null`，控制器回 404，后续相同短码直接命中空值，不穿透数据库。
+
+### 点击计数同步
+
+跳转产生的计数先落在 Redis（避免每次请求写库），`ClickCountSyncTask` 每 10 秒扫描 `shortLink:count:*`，读取后删除 key，把增量累加到数据库 `click_count` 字段。计数先走 Redis 再异步落库，与访问日志一样不阻塞跳转主流程。
 
 ## 性能对比（本地同环境）
 
@@ -178,8 +187,7 @@ GET http://localhost:8090/s/{code}
 
 ## 当前局限 / 待完善
 
-- `access_log` 实体已建，访问日志（IP、UA、访问时间）尚未落库。
-- `clickCount` 点击计数未在跳转时累加。
 - 分布式锁（防重复提交）代码已注释，未启用。
 - `expireTime` 字段已预留，过期清理逻辑未实现。
 - 短码冲突、原链合法性校验未做。
+- 定时任务使用 `keys` 扫描计数前缀，数据量大时可考虑改用 scan 或计数单独存储。

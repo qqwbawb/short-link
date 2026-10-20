@@ -4,10 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.xs.common.utils.ResultUtils;
 import com.xs.common.utils.ResultVo;
 import com.xs.entity.ShortLink;
+import com.xs.service.AccessLogService;
 import com.xs.service.ShortLinkService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.websocket.server.PathParam;
 import java.io.IOException;
@@ -32,8 +34,14 @@ public class ShortLinkController {
         return ResultUtils.success("生成成功",shortLink);
     }
 
+    @Autowired
+    private AccessLogService accessLogService;
+
     @GetMapping("/s/{code}")
-    public void getShortLink(@PathVariable("code") String shortCode, HttpServletResponse response) throws IOException {
+    public void getShortLink(@PathVariable("code") String shortCode, HttpServletRequest request, HttpServletResponse response) throws IOException {
+
+        String ip = request.getRemoteAddr();
+        String userAgent = request.getHeader("user-agent");
 
         String one = shortLinkService.getOriginalUrl(shortCode);
         if(one==null){
@@ -41,6 +49,9 @@ public class ShortLinkController {
             response.getWriter().write("短链不存在");
             return;
         }
+
+        accessLogService.saveAccessLog(shortCode,ip,userAgent);
+
         response.sendRedirect(one);
     }
 }
