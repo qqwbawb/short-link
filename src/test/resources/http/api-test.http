@@ -65,3 +65,15 @@ GET http://localhost:8090/s/
 ###
 ### ⚠️ 把 ① 里的 1 换成你实际的 shortCode
 ###    可以查数据库：SELECT short_code FROM short_link;
+
+### 空值（应该 400）
+POST http://localhost:8090/api/link
+Content-Type: application/json
+
+{"originalUrl": ""}
+
+### 重复创建（应该走 BizException）
+POST http://localhost:8090/api/link
+Content-Type: application/json
+
+{"originalUrl": "https://www.baidu.com"}

@@ -23,7 +23,7 @@ public class ClickCountSyncTask {
 
     private static final String COUNT_PREFIX = "shortLink:count:";
 
-    @Scheduled(fixedRate = 10000)
+    @Scheduled(fixedRate = 5*60*1000)
     public void syncClickCount(){
         Set<String> keys=redisTemplate.keys(COUNT_PREFIX+"*");
         if(keys==null||keys.size()==0){

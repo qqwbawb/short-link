@@ -6,7 +6,7 @@ import com.xs.entity.ShortLink;
 public interface ShortLinkService extends IService<ShortLink> {
 
     //生成短码并保存
-    ShortLink createShortLink(String originaurl);
+    ShortLink createShortLink(String originaurl,Integer expireDay);
 
     //根据短码查原链
     String getOriginalUrl(String shortCode);

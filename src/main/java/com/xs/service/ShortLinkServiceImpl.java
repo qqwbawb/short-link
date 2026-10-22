@@ -2,6 +2,7 @@ package com.xs.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xs.common.exception.BizException;
 import com.xs.entity.ShortLink;
 import com.xs.mapper.ShortLinkMapper;
 import com.xs.utils.ShortCodeGenerator;
@@ -18,8 +19,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLink>
     @Autowired
     ShortCodeGenerator shortCodeGenerator;
 
+    @Autowired
+    RedisTemplate<String,Object> redisTemplate;
+
     @Override
-    public ShortLink createShortLink(String originaurl) {
+    public ShortLink createShortLink(String originaurl,Integer expireDay) {
         //生成短码
         String shortCode=shortCodeGenerator.generateShortCode();
         //封装对象
@@ -28,13 +32,13 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLink>
         shortLink.setOriginalUrl(originaurl);
         shortLink.setClickCount(0L);
         shortLink.setCreateTime(LocalDateTime.now());
+        if(expireDay!=null&&expireDay>0){
+            shortLink.setExpireTime(LocalDateTime.now().plusDays(expireDay));
+        }
         //存入数据库
         this.save(shortLink);
         return shortLink;
     }
-
-    @Autowired
-    RedisTemplate<String,Object> redisTemplate;
 
     private static final String PREFIX = "shortLink:";
 
@@ -65,6 +69,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLink>
             return null;
         }
 
+        //判断链接是否过期
+        if (shortLink.getExpireTime()!=null&&shortLink.getExpireTime().isBefore(LocalDateTime.now())){
+            redisTemplate.opsForValue().set(key,"",60,TimeUnit.SECONDS);
+            return null;
+        }
         redisTemplate.opsForValue().set(key,shortLink.getOriginalUrl(),1, TimeUnit.HOURS);
         redisTemplate.opsForValue().increment(COUNT_PREFIX+shortCode);
         //分布式锁，防止重复提交

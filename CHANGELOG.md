@@ -2,6 +2,24 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.2.0] - 2026-10-22
+
+### 新增
+
+- 引入 `spring-boot-starter-validation`，创建短链接口参数校验：原链非空、长度 ≤ 2048、必须以 http/https 开头，校验失败返回 400 及具体原因。
+- 全局异常处理 `GlobalExceptionHandler`（`@RestControllerAdvice`）：`BizException` → 500、参数校验异常 → 400、未捕获异常 → 500，统一响应体 `ResultVo`。
+- 创建短链支持可选 `expireDay`，写入 `expireTime`（创建时间 + 天数）。
+- 跳转时校验过期时间：已过期短链按不存在处理（404），并写入空值缓存。
+- 查询短链详情接口 `GET /api/link/{code}`。
+- 查询短链统计接口 `GET /api/link/{code}/stats`：点击量、创建/过期时间 + 最近 10 条访问日志（倒序）。
+- 新增 `dto` 包：`CreateLinkRequest`（创建请求）、`LinkStatsVo`（统计视图对象）。
+
+### 变更
+
+- 重复创建短链由返回 `code=500` 改为抛出 `BizException`，经全局异常处理器统一返回。
+- 点击计数同步任务频率由每 10 秒调整为每 5 分钟，降低数据库写入压力。
+- 测试脚本新增空值参数（预期 400）、重复创建（预期 BizException）用例。
+
 ## [1.1.0] - 2026-10-20
 
 ### 新增
